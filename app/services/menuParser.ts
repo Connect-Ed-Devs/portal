@@ -7,7 +7,7 @@ export interface Course {
     foodItems: string;
 }
 
-export interface MenuDay {
+export interface MealTime {
     id: number;
     timeOfDay: string;
     startTime: string;
@@ -15,8 +15,14 @@ export interface MenuDay {
     courses: Course[];
 }
 
-export interface ParsedMenu {
-    [dayIndex: number]: MenuDay;
+export interface DayMenu {
+    id: number;
+    dayName: string;
+    meals: MealTime[];
+}
+
+export interface ParsedWeeklyMenu {
+    [dayIndex: number]: DayMenu;
 }
 
 export class MenuParser {
@@ -40,18 +46,18 @@ export class MenuParser {
     /**
      * Parse OCR text into structured menu data
      */
-    static parseMenu(ocrText: string): ParsedMenu {
+    static parseMenu(ocrText: string): ParsedWeeklyMenu {
         console.log('Starting menu parsing...');
 
         const cleanedText = this.cleanText(ocrText);
         const dayBlocks = this.extractDayBlocks(cleanedText);
 
-        const parsedMenu: ParsedMenu = {};
+        const parsedMenu: ParsedWeeklyMenu = {};
 
         dayBlocks.forEach((dayBlock, index) => {
-            const menuDay = this.parseDayBlock(dayBlock, index);
-            if (menuDay) {
-                parsedMenu[index] = menuDay;
+            const dayMenu = this.parseDayBlock(dayBlock, index);
+            if (dayMenu) {
+                parsedMenu[index] = dayMenu;
             }
         });
 
@@ -112,14 +118,87 @@ export class MenuParser {
     }
 
     /**
-     * Parse a single day block into a MenuDay object
+     * Parse a single day block into a DayMenu object with multiple meals
      */
-    private static parseDayBlock(dayBlock: string, dayIndex: number): MenuDay | null {
+    private static parseDayBlock(dayBlock: string, dayIndex: number): DayMenu | null {
         const lines = dayBlock.split('\n').map(line => line.trim()).filter(line => line);
 
         if (lines.length === 0) return null;
 
         const headerLine = lines[0];
+
+        // Extract day name from header
+        const dayName = this.extractDayName(headerLine) || `Day ${dayIndex + 1}`;
+
+        // Split the day block into meal sections
+        const mealSections = this.extractMealSections(lines);
+
+        const meals: MealTime[] = [];
+
+        mealSections.forEach((mealSection, mealIndex) => {
+            const mealTime = this.parseMealSection(mealSection, mealIndex);
+            if (mealTime) {
+                meals.push(mealTime);
+            }
+        });
+
+        return {
+            id: dayIndex,
+            dayName: dayName,
+            meals: meals
+        };
+    }
+
+    /**
+     * Extract day name from header line
+     */
+    private static extractDayName(headerLine: string): string | null {
+        for (let i = 0; i < this.DAY_PATTERNS.length; i++) {
+            const pattern = this.DAY_PATTERNS[i];
+            if (pattern.test(headerLine)) {
+                const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                return dayNames[i];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Extract meal sections from day lines
+     */
+    private static extractMealSections(lines: string[]): string[][] {
+        const mealSections: string[][] = [];
+        let currentSection: string[] = [];
+
+        for (const line of lines) {
+            // Check if this line indicates a new meal time
+            const isMealTimeHeader = this.TIME_OF_DAY_PATTERNS.some(({ pattern }) => pattern.test(line)) ||
+                /\d{1,2}:\d{2}(?:am|pm)?/i.test(line);
+
+            if (isMealTimeHeader && currentSection.length > 0) {
+                // Save the previous section
+                mealSections.push([...currentSection]);
+                currentSection = [];
+            }
+
+            currentSection.push(line);
+        }
+
+        // Add the last section
+        if (currentSection.length > 0) {
+            mealSections.push(currentSection);
+        }
+
+        return mealSections;
+    }
+
+    /**
+     * Parse a single meal section into a MealTime object
+     */
+    private static parseMealSection(mealSection: string[], mealIndex: number): MealTime | null {
+        if (mealSection.length === 0) return null;
+
+        const headerLine = mealSection[0];
         const timeInfo = this.extractTimeInfo(headerLine);
 
         if (!timeInfo) {
@@ -127,10 +206,10 @@ export class MenuParser {
             return null;
         }
 
-        const courses = this.parseCourses(lines.slice(1));
+        const courses = this.parseCourses(mealSection.slice(1));
 
         return {
-            id: dayIndex,
+            id: mealIndex,
             timeOfDay: timeInfo.timeOfDay,
             startTime: timeInfo.startTime,
             endTime: timeInfo.endTime,
@@ -139,7 +218,7 @@ export class MenuParser {
     }
 
     /**
-     * Extract time information from a day header line
+     * Extract time information from a meal header line
      */
     private static extractTimeInfo(headerLine: string): {
         timeOfDay: string;

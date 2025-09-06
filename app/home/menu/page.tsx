@@ -10,15 +10,24 @@ import AddMenuDialog from '@/app/components/AddMenuDialog';
 
 interface Menu {
     id: string;
-    week?: string;
     date?: string;
+    dayName?: string;
     published?: boolean;
-    meals?: Record<string, {
-        startTime?: string;
-        endTime?: string;
-        courses?: Record<string, {
-            courseType?: string;
-            foodItem?: string;
+    notes?: string;
+    userId?: string;
+    createdAt?: {
+        seconds: number;
+        nanoseconds: number;
+    };
+    meals?: Array<{
+        id: string;
+        timeOfDay: string;
+        startTime: string;
+        endTime: string;
+        courses: Array<{
+            id: string;
+            courseType: string;
+            foodItem: string;
         }>;
     }>;
     updatedAt?: {
@@ -103,7 +112,7 @@ export default function ManageMenusPage() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="rounded-lg shadow-md p-6">
                     <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-2xl font-bold text-white">Weekly Menus</h1>
+                        <h1 className="text-2xl font-bold text-white">Daily Menus</h1>
                         <button
                             onClick={() => setShowAddMenuDialog(true)}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 font-medium"
@@ -133,13 +142,8 @@ export default function ManageMenusPage() {
                                         >
                                             <div className="flex items-center space-x-3">
                                                 <h3 className="text-base font-medium text-white">
-                                                    {menu.date || 'No Date'}
+                                                    {menu.dayName ? `${menu.dayName} - ${menu.date || 'No Date'}` : menu.date || 'No Date'}
                                                 </h3>
-                                                {menu.week && (
-                                                    <span className="text-sm text-gray-400">
-                                                        Week {menu.week}
-                                                    </span>
-                                                )}
                                             </div>
                                             <div className="flex items-center space-x-1">
                                                 <div className={`transform transition-transform text-gray-400 ${isExpanded ? 'rotate-180' : ''}`}>
@@ -158,10 +162,10 @@ export default function ManageMenusPage() {
                                                             <span className="font-medium text-gray-300">Date:</span>
                                                             <span className="ml-2 text-white">{menu.date || 'Not specified'}</span>
                                                         </div>
-                                                        {menu.week && (
+                                                        {menu.dayName && (
                                                             <div>
-                                                                <span className="font-medium text-gray-300">Week:</span>
-                                                                <span className="ml-2 text-white">{menu.week}</span>
+                                                                <span className="font-medium text-gray-300">Day:</span>
+                                                                <span className="ml-2 text-white">{menu.dayName}</span>
                                                             </div>
                                                         )}
                                                         {menu.published !== undefined && (
@@ -172,49 +176,65 @@ export default function ManageMenusPage() {
                                                                 </span>
                                                             </div>
                                                         )}
+                                                        {menu.createdAt && (
+                                                            <div>
+                                                                <span className="font-medium text-gray-300">Created:</span>
+                                                                <span className="ml-2 text-white">
+                                                                    {new Date(menu.createdAt.seconds * 1000).toLocaleDateString()}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {menu.userId && (
+                                                            <div>
+                                                                <span className="font-medium text-gray-300">Created by:</span>
+                                                                <span className="ml-2 text-white text-xs">{menu.userId.substring(0, 8)}...</span>
+                                                            </div>
+                                                        )}
                                                     </div>
 
+                                                    {/* Notes Section */}
+                                                    {menu.notes && (
+                                                        <div className="mt-4 p-3 bg-gray-600 rounded-lg">
+                                                            <h5 className="font-medium text-white mb-2">Notes</h5>
+                                                            <p className="text-gray-300 text-sm">{menu.notes}</p>
+                                                        </div>
+                                                    )}
+
                                                     {/* Meals Details */}
-                                                    {menu.meals && (
+                                                    {menu.meals && Array.isArray(menu.meals) && (
                                                         <div>
-                                                            <h4 className="font-medium text-white mb-3">Daily Meals</h4>
-                                                            <div className="text-sm">
-                                                                {typeof menu.meals === 'object' && menu.meals !== null ? (
-                                                                    <div className="space-y-4">
-                                                                        {Object.entries(menu.meals).map(([mealTime, mealData]) => (
-                                                                            <div key={mealTime} className="bg-gray-700 rounded-lg p-3">
-                                                                                <h5 className="font-medium text-white capitalize mb-2 border-b border-gray-600 pb-1">
-                                                                                    {mealTime}
-                                                                                    {mealData?.startTime && mealData?.endTime && (
-                                                                                        <span className="text-xs text-gray-400 ml-2">
-                                                                                            ({mealData.startTime} - {mealData.endTime})
-                                                                                        </span>
-                                                                                    )}
-                                                                                </h5>
-                                                                                {typeof mealData === 'object' && mealData?.courses ? (
-                                                                                    <div className="space-y-2">
-                                                                                        {Object.entries(mealData.courses || {}).map(([courseKey, courseData]) => (
-                                                                                            <div key={courseKey} className="ml-2">
-                                                                                                <div className="text-gray-300 font-medium">
-                                                                                                    {courseData?.courseType || courseKey}:
-                                                                                                </div>
-                                                                                                <div className="text-white ml-3 text-sm">
-                                                                                                    {courseData?.foodItem || 'Menu item available'}
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        ))}
+                                                            <h4 className="font-medium text-white mb-3">Meals</h4>
+                                                            <div className="text-sm space-y-4">
+                                                                {menu.meals.map((meal) => (
+                                                                    <div key={meal.id} className="bg-gray-700 rounded-lg p-3">
+                                                                        <h5 className="font-medium text-white capitalize mb-2 border-b border-gray-600 pb-1">
+                                                                            {meal.timeOfDay}
+                                                                            {meal.startTime && meal.endTime && (
+                                                                                <span className="text-xs text-gray-400 ml-2">
+                                                                                    ({meal.startTime} - {meal.endTime})
+                                                                                </span>
+                                                                            )}
+                                                                        </h5>
+                                                                        {meal.courses && Array.isArray(meal.courses) ? (
+                                                                            <div className="space-y-2">
+                                                                                {meal.courses.map((course) => (
+                                                                                    <div key={course.id} className="ml-2">
+                                                                                        <div className="text-gray-300 font-medium">
+                                                                                            {course.courseType}:
+                                                                                        </div>
+                                                                                        <div className="text-white ml-3 text-sm">
+                                                                                            {course.foodItem || 'Menu item available'}
+                                                                                        </div>
                                                                                     </div>
-                                                                                ) : (
-                                                                                    <div className="text-gray-300 ml-2">
-                                                                                        Menu available - details not structured
-                                                                                    </div>
-                                                                                )}
+                                                                                ))}
                                                                             </div>
-                                                                        ))}
+                                                                        ) : (
+                                                                            <div className="text-gray-300 ml-2">
+                                                                                No courses available
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                ) : (
-                                                                    <div className="text-gray-300">No meal data available</div>
-                                                                )}
+                                                                ))}
                                                             </div>
                                                         </div>
                                                     )}
