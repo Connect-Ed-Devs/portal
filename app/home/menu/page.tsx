@@ -7,6 +7,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Navigation from '@/app/components/Navigation';
 import AddMenuDialog from '@/app/components/AddMenuDialog';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 
 interface Menu {
     id: string;
@@ -41,17 +42,18 @@ interface Menu {
 export default function ManageMenusPage() {
     const { user, loading } = useAuth();
     const router = useRouter();
+    const { canManageFood, loading: permissionsLoading } = useUserPermissions();
     const [menus, setMenus] = useState<Menu[]>([]);
     const [menusLoading, setMenusLoading] = useState(true);
     const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
     const [showAddMenuDialog, setShowAddMenuDialog] = useState(false);
 
     useEffect(() => {
-        // Redirect to login if not authenticated
-        if (!loading && !user) {
-            router.push('/');
+        // Redirect to login if not authenticated or unauthorized
+        if (!loading && !permissionsLoading && (!user || !canManageFood)) {
+            router.push('/home');
         }
-    }, [user, loading, router]);
+    }, [user, loading, permissionsLoading, canManageFood, router]);
 
     // Fetch menus from Firebase
     useEffect(() => {
@@ -89,8 +91,8 @@ export default function ManageMenusPage() {
         setExpandedMenu(expandedMenu === menuId ? null : menuId);
     };
 
-    // Show loading while checking auth status
-    if (loading) {
+    // Show loading while checking auth status and permissions
+    if (loading || permissionsLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="text-foreground">Loading...</div>
@@ -99,7 +101,7 @@ export default function ManageMenusPage() {
     }
 
     // Don't render anything if redirecting
-    if (!user) {
+    if (!user || !canManageFood) {
         return null;
     }
 
