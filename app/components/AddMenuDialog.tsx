@@ -3,7 +3,12 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createWorker } from 'tesseract.js';
-import { MenuParser } from '../services/menuParser';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Set up PDF.js worker - use local file served from public directory
+if (typeof window !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+}
 
 interface AddMenuDialogProps {
     isOpen: boolean;
@@ -63,42 +68,89 @@ export default function AddMenuDialog({ isOpen, onClose }: AddMenuDialogProps) {
         }
 
         setIsProcessing(true);
-        console.log(`🔍 Starting OCR extraction for ${files.length} files...`);
+        console.log(`🔍 Starting text extraction for ${files.length} files...`);
         const allExtractedTexts: string[] = [];
 
-        // First, extract text from all PNG files
+        // Process each file based on its type
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
 
             console.log(`📄 Processing file ${i + 1}/${files.length}: ${file.name}`);
 
-            // Check if file is PNG
-            if (!file.type.includes('png')) {
-                console.warn(`⚠️ Skipping ${file.name} - not a PNG file`);
+            // Check if file is PNG or PDF
+            if (file.type.includes('png')) {
+                // Handle PNG files with OCR
+                try {
+                    // Create a Tesseract worker
+                    const worker = await createWorker('eng');
+
+                    console.log(`🤖 OCR worker created, analyzing ${file.name}...`);
+
+                    // Extract text from the image
+                    const { data: { text } } = await worker.recognize(file);
+
+                    console.log(`✅ Text extracted from ${file.name} via OCR`);
+                    console.log('Raw OCR text:', text);
+                    console.log('---');
+
+                    // Add to our collection of texts
+                    allExtractedTexts.push(text);
+
+                    // Terminate the worker
+                    await worker.terminate();
+
+                } catch (error) {
+                    console.error(`❌ Error processing PNG file ${file.name}:`, error);
+                }
+
+            } else if (file.type.includes('pdf')) {
+                // Handle PDF files with direct text extraction
+                try {
+                    console.log(`📋 Extracting text directly from PDF ${file.name}...`);
+
+                    // Convert file to ArrayBuffer
+                    const arrayBuffer = await file.arrayBuffer();
+
+                    // Load PDF document
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    const numPages = pdf.numPages;
+                    console.log(`📄 PDF has ${numPages} pages`);
+
+                    let fullText = '';
+
+                    // Extract text from each page
+                    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                        const page = await pdf.getPage(pageNum);
+                        const textContent = await page.getTextContent();
+                        
+                        // Combine text items from the page
+                        const pageText = textContent.items
+                            .map((item) => {
+                                if ('str' in item) {
+                                    return item.str;
+                                }
+                                return '';
+                            })
+                            .join(' ');
+                        
+                        fullText += pageText + '\n';
+                        console.log(`📃 Extracted text from page ${pageNum}`);
+                    }
+
+                    console.log(`✅ Text extracted from ${file.name} via PDF parsing`);
+                    console.log('Raw PDF text:', fullText);
+                    console.log('---');
+
+                    // Add to our collection of texts
+                    allExtractedTexts.push(fullText);
+
+                } catch (error) {
+                    console.error(`❌ Error processing PDF file ${file.name}:`, error);
+                }
+
+            } else {
+                console.warn(`⚠️ Skipping ${file.name} - unsupported file type (only PNG and PDF are supported)`);
                 continue;
-            }
-
-            try {
-                // Create a Tesseract worker
-                const worker = await createWorker('eng');
-
-                console.log(`🤖 OCR worker created, analyzing ${file.name}...`);
-
-                // Extract text from the image
-                const { data: { text } } = await worker.recognize(file);
-
-                console.log(`✅ Text extracted from ${file.name}`);
-                console.log('Raw OCR text:', text);
-                console.log('---');
-
-                // Add to our collection of texts
-                allExtractedTexts.push(text);
-
-                // Terminate the worker
-                await worker.terminate();
-
-            } catch (error) {
-                console.error(`❌ Error processing ${file.name}:`, error);
             }
         }
 
@@ -111,16 +163,46 @@ export default function AddMenuDialog({ isOpen, onClose }: AddMenuDialogProps) {
             console.log(combinedText);
             console.log('===============================');
 
-            // Parse the combined menu
-            const parsedMenuData = MenuParser.parseMenu(combinedText);
-            console.log('🎉 Final parsed menu structure:', parsedMenuData);
+            try {
+                // Parse the combined menu using Grok API
+                console.log('🤖 Sending text to Grok API for parsing...');
+                const response = await fetch('/api/parse-menu', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: combinedText }),
+                });
 
-            // Navigate to review page with the parsed data
-            const menuDataParam = encodeURIComponent(JSON.stringify(parsedMenuData));
-            router.push(`/home/menu/review?menuData=${menuDataParam}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.details || 'Failed to parse menu');
+                }
 
-            // Close the dialog
-            onClose();
+                const result = await response.json();
+                const parsedMenuData = result.data;
+                
+                console.log('🎉 Final parsed menu structure from Grok:', parsedMenuData);
+
+                // Store the parsed data in sessionStorage to avoid URL length limits
+                const storageKey = `parsedMenu_${Date.now()}`;
+                sessionStorage.setItem(storageKey, JSON.stringify(parsedMenuData));
+                
+                // Navigate to review page with just the storage key
+                router.push(`/home/menu/review?storageKey=${storageKey}`);
+
+                // Close the dialog
+                onClose();
+                
+            } catch (error) {
+                console.error('❌ Failed to parse menu with Grok API:', error);
+                
+                // Show more detailed error information
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                console.error('Full error details:', errorMessage);
+                
+                alert(`Failed to parse menu: ${errorMessage}\n\nPlease check the browser console for more details.`);
+            }
         } else {
             console.log('❌ No text was extracted from any files');
         }
@@ -191,11 +273,12 @@ export default function AddMenuDialog({ isOpen, onClose }: AddMenuDialogProps) {
                                     type="file"
                                     className="sr-only"
                                     multiple
+                                    accept=".png,.pdf"
                                     onChange={handleFileInput}
                                 />
                             </div>
                             <p className="text-xs text-gray-500">
-                                PNG Files Only
+                                PNG and PDF Files
                             </p>
                         </div>
                     </div>

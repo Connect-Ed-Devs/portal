@@ -41,30 +41,39 @@ function MenuReviewContent() {
     }, [user, loading, router]);
 
     useEffect(() => {
-        // Get the menu data from URL params (passed from the dialog)
-        const menuDataParam = searchParams.get('menuData');
-        if (menuDataParam) {
+        // Get the menu data from sessionStorage using the storage key from URL
+        const storageKey = searchParams.get('storageKey');
+        if (storageKey && typeof window !== 'undefined') {
             try {
-                const parsed = JSON.parse(decodeURIComponent(menuDataParam)) as ParsedWeeklyMenu;
-                setEditedMenu(JSON.parse(JSON.stringify(parsed))); // Deep copy for editing
+                const storedData = sessionStorage.getItem(storageKey);
+                if (storedData) {
+                    const parsed = JSON.parse(storedData) as ParsedWeeklyMenu;
+                    setEditedMenu(JSON.parse(JSON.stringify(parsed))); // Deep copy for editing
 
-                // Set default week start date to current Monday
-                const today = new Date();
-                const monday = new Date(today);
-                const dayOfWeek = today.getDay();
-                const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust for Sunday
-                monday.setDate(diff);
-                setWeekStartDate(monday.toISOString().split('T')[0]);
+                    // Set default week start date to current Monday
+                    const today = new Date();
+                    const monday = new Date(today);
+                    const dayOfWeek = today.getDay();
+                    const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust for Sunday
+                    monday.setDate(diff);
+                    setWeekStartDate(monday.toISOString().split('T')[0]);
 
-                // By default, select all days for publishing
-                const dayIndices = Object.keys(parsed).map(Number);
-                setSelectedDaysToPublish(new Set(dayIndices));
+                    // By default, select all days for publishing
+                    const dayIndices = Object.keys(parsed).map(Number);
+                    setSelectedDaysToPublish(new Set(dayIndices));
+
+                    // Clean up the sessionStorage after loading (optional)
+                    // sessionStorage.removeItem(storageKey);
+                } else {
+                    console.error('No menu data found in sessionStorage for key:', storageKey);
+                    router.push('/home/menu');
+                }
             } catch (error) {
-                console.error('Error parsing menu data:', error);
+                console.error('Error parsing menu data from sessionStorage:', error);
                 router.push('/home/menu');
             }
         } else {
-            // No menu data, redirect back
+            // No storage key, redirect back
             router.push('/home/menu');
         }
     }, [searchParams, router]);
