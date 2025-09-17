@@ -21,12 +21,12 @@ Parse the text into a JSON structure with this exact schema:
           {
             "id": 0,
             "courseType": "Entrée",
-            "foodItems": "Pancakes, French Toast, Scrambled Eggs"
+            "foodItems": "Pancakes\nFrench Toast\nScrambled Eggs"
           },
           {
             "id": 1,
             "courseType": "International Station",
-            "foodItems": "Fresh Fruit, Yogurt Parfait"
+            "foodItems": "Fresh Fruit\nYogurt Parfait"
           }
         ]
       },
@@ -39,7 +39,7 @@ Parse the text into a JSON structure with this exact schema:
           {
             "id": 0,
             "courseType": "Entrée",
-            "foodItems": "Grilled Chicken, Fish and Chips, Veggie Burger"
+            "foodItems": "Grilled Chicken\nFish and Chips\nVeggie Burger"
           }
         ]
       }
@@ -84,6 +84,7 @@ Map menu sections to these standardized course types:
 ### 4. Food Item Processing
 
 - Combine multiple food items in a course with commas and spaces
+- **For "Entrée" and "International Station" sections: Add a new line between each food item for better readability**
 - Remove OCR artifacts: `[symbols]`, `(random letters)`, `@@`, `*`, bullet points
 - Remove dietary indicators if they're just symbols: `[V]`, `(Vv)`, standalone letters
 - Clean up spacing and formatting
@@ -149,6 +150,8 @@ Grilled Chicken Breast
 Fish and Chips
 Veggie Burger
 ```
+
+**Note**: For Entrée and International Station sections, each food item should be separated by newlines (\n) in the final JSON output for better readability.
 
 ### Scenario 2: Complex Layout with OCR Issues
 

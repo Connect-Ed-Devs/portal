@@ -184,7 +184,7 @@ export class GrokMenuParser {
           {
             "id": 0,
             "courseType": "Entrée",
-            "foodItems": "Pancakes, French Toast, Scrambled Eggs"
+            "foodItems": "Pancakes\\nFrench Toast\\nScrambled Eggs"
           }
         ]
       }
@@ -197,6 +197,7 @@ Rules:
 - timeOfDay: breakfast,lunch,dinner,brunch
 - Times: "7:00am", "11:20am-1pm" format
 - courseType: "Entrée","International Station","Salads of the Day","Soups of the Day","Pasta Station","Dessert","Main Items"
+- For "Entrée" and "International Station" sections: Use \\n to separate each food item for better readability
 - Clean OCR artifacts: remove [symbols], @@, *, bullets
 - Stop at "Notice" sections
 

@@ -335,10 +335,15 @@ export class MenuParser {
             if (isCourseType) {
                 // Save the previous course if it exists
                 if (currentCourseType && currentFoodItems.length > 0) {
+                    // Use newlines for Entrée and International Station sections for better readability
+                    const separator = (currentCourseType === 'Entrée' || currentCourseType === 'International Station') 
+                        ? '\n' 
+                        : ', ';
+                    
                     courses.push({
                         id: courseId++,
                         courseType: currentCourseType,
-                        foodItems: currentFoodItems.join(', ')
+                        foodItems: currentFoodItems.join(separator)
                     });
                 }
 
@@ -365,10 +370,15 @@ export class MenuParser {
 
         // Add the last course
         if (currentCourseType && currentFoodItems.length > 0) {
+            // Use newlines for Entrée and International Station sections for better readability
+            const separator = (currentCourseType === 'Entrée' || currentCourseType === 'International Station') 
+                ? '\n' 
+                : ', ';
+                
             courses.push({
                 id: courseId++,
                 courseType: currentCourseType,
-                foodItems: currentFoodItems.join(', ')
+                foodItems: currentFoodItems.join(separator)
             });
         }
 
