@@ -3,12 +3,6 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createWorker } from 'tesseract.js';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Set up PDF.js worker - use local file served from public directory
-if (typeof window !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-}
 
 interface AddMenuDialogProps {
     isOpen: boolean;
@@ -107,6 +101,14 @@ export default function AddMenuDialog({ isOpen, onClose }: AddMenuDialogProps) {
                 // Handle PDF files with direct text extraction
                 try {
                     console.log(`📋 Extracting text directly from PDF ${file.name}...`);
+
+                    // Dynamically import PDF.js to avoid SSR issues
+                    const pdfjsLib = await import('pdfjs-dist');
+                    
+                    // Set up PDF.js worker - use local file served from public directory
+                    if (typeof window !== 'undefined') {
+                        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+                    }
 
                     // Convert file to ArrayBuffer
                     const arrayBuffer = await file.arrayBuffer();
